@@ -33,3 +33,8 @@ export function getAnyLocationId() {
   const keys = Object.keys(load()).filter((k) => !k.startsWith("company:"));
   return keys[0] || null;
 }
+
+export function getAnyCompanyId() {
+  const key = Object.keys(load()).find((k) => k.startsWith("company:"));
+  return key ? key.slice("company:".length) : null;
+}

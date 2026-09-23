@@ -36,22 +36,69 @@ export async function exchangeCode(code) {
     return tokens;
   }
 
-  // Agency-level install: we got a company token. Store it, then mint a
-  // location-scoped token for the configured sub-account.
+  // Agency-level install: we got a company token. Store it, then figure
+  // out which sub-account(s) the app is attached to and link one.
   if (tokens.companyId) {
     setTokens(`company:${tokens.companyId}`, tokens);
-    if (!config.ghl.locationId) {
-      throw new Error(
-        "App was installed at the agency level. Add GHL_LOCATION_ID=<your location id> to .env and restart, then reinstall."
-      );
-    }
-    await mintLocationToken(tokens.companyId, config.ghl.locationId);
-    return { locationId: config.ghl.locationId };
+    return finishAgencyInstall(tokens.companyId);
   }
 
   throw new Error(
     `OAuth token response had neither locationId nor companyId (got keys: ${Object.keys(tokens).join(", ")})`
   );
+}
+
+/**
+ * Ask GHL which sub-accounts this app is actually installed on,
+ * pick the right one, and mint a location-scoped token for it.
+ * Safe to call repeatedly (also used by the /oauth/finish repair page).
+ */
+export async function finishAgencyInstall(companyId) {
+  const company = getTokens(`company:${companyId}`);
+  if (!company?.access_token) {
+    throw new Error(`No agency token stored for company ${companyId} — run the install first.`);
+  }
+  const appId = config.ghl.clientId.split("-")[0];
+  let locations = [];
+  try {
+    const res = await axios.get(`${config.ghl.apiBase}/oauth/installedLocations`, {
+      params: { companyId, appId, isInstalled: true, limit: 100 },
+      headers: {
+        Authorization: `Bearer ${company.access_token}`,
+        Version: "2021-07-28",
+      },
+    });
+    locations = res.data?.locations || res.data || [];
+  } catch (err) {
+    console.error("installedLocations lookup failed:", err.response?.data || err.message);
+  }
+
+  const ids = locations.map((l) => l._id || l.id || l.locationId).filter(Boolean);
+  console.log(`App is installed on ${ids.length} sub-account(s):`, ids.join(", ") || "(none)");
+
+  // Prefer the configured location if it's genuinely installed; else take
+  // whatever location GHL says has the app.
+  let target = null;
+  if (config.ghl.locationId && ids.includes(config.ghl.locationId)) {
+    target = config.ghl.locationId;
+  } else if (ids.length > 0) {
+    target = ids[0];
+  } else if (config.ghl.locationId) {
+    target = config.ghl.locationId; // last resort: try the configured one anyway
+  }
+
+  if (!target) {
+    throw new Error(
+      "The app is installed at the agency level but attached to ZERO sub-accounts. " +
+        "In GoHighLevel, open the app page and click 'Install to more sub-accounts', " +
+        "select Straw Hut Media, then open the /oauth/finish link again."
+    );
+  }
+
+  const minted = await mintLocationToken(companyId, target);
+  const name = locations.find((l) => (l._id || l.id || l.locationId) === target)?.name || "";
+  console.log(`Linked to location ${target} ${name ? `(${name})` : ""}`);
+  return { locationId: target, name, ...minted };
 }
 
 /**

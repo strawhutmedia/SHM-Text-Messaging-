@@ -2,7 +2,7 @@ import express from "express";
 import { config } from "./config.js";
 import * as bb from "./bluebubbles.js";
 import * as ghl from "./ghl.js";
-import { getAnyLocationId, getTokens } from "./store.js";
+import { getAnyLocationId, getAnyCompanyId, getTokens } from "./store.js";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -51,6 +51,30 @@ app.get("/oauth/callback", async (req, res) => {
       .send(
         `<h2>OAuth exchange failed</h2><pre>${JSON.stringify(detail, null, 2)}</pre><p>Send a screenshot of this page to Claude.</p>`
       );
+  }
+});
+
+// Repair page: if the app was installed at the agency level, this retries
+// linking a sub-account using the stored agency token — no reinstall needed.
+//   {PUBLIC_URL}/oauth/finish?secret=WEBHOOK_SECRET
+app.get("/oauth/finish", requireSecret, async (_req, res) => {
+  try {
+    const companyId = getAnyCompanyId();
+    if (!companyId) {
+      return res
+        .status(400)
+        .send("<h2>No agency token stored yet</h2><p>Run the app install first, then reload this page.</p>");
+    }
+    const result = await ghl.finishAgencyInstall(companyId);
+    res.send(
+      `<h2>✅ Connected!</h2><p>Linked to sub-account <b>${result.name || ""}</b> (${result.locationId}). You can close this tab.</p>`
+    );
+  } catch (err) {
+    const detail = err.response?.data || err.message;
+    console.error("oauth/finish failed:", JSON.stringify(detail, null, 2));
+    res
+      .status(500)
+      .send(`<h2>Not linked yet</h2><pre>${JSON.stringify(detail, null, 2)}</pre><p>Send a screenshot of this page to Claude.</p>`);
   }
 });
 
