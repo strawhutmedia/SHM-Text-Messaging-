@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit these
+.env
+
+# Runtime data (OAuth tokens, message id cache)
+data/
+
+# OS junk
+.DS_Store
+
+# Logs
+*.log
