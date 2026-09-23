@@ -24,6 +24,9 @@ export const config = {
     clientId: required("GHL_CLIENT_ID"),
     clientSecret: required("GHL_CLIENT_SECRET"),
     conversationProviderId: required("GHL_CONVERSATION_PROVIDER_ID"),
+    // Needed when the app gets installed at the agency (company) level:
+    // we then mint a location-scoped token for this specific sub-account.
+    locationId: process.env.GHL_LOCATION_ID || "",
     apiBase: "https://services.leadconnectorhq.com",
   },
 

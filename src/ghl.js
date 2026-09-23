@@ -29,17 +29,81 @@ export async function exchangeCode(code) {
     { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
   );
   const tokens = res.data;
-  if (!tokens.locationId) {
-    throw new Error(
-      `OAuth token response did not include a locationId (got keys: ${Object.keys(tokens).join(", ")})`
-    );
+
+  // Location-level install: tokens are already scoped to the sub-account.
+  if (tokens.locationId) {
+    setTokens(tokens.locationId, tokens);
+    return tokens;
   }
-  setTokens(tokens.locationId, tokens);
-  return tokens;
+
+  // Agency-level install: we got a company token. Store it, then mint a
+  // location-scoped token for the configured sub-account.
+  if (tokens.companyId) {
+    setTokens(`company:${tokens.companyId}`, tokens);
+    if (!config.ghl.locationId) {
+      throw new Error(
+        "App was installed at the agency level. Add GHL_LOCATION_ID=<your location id> to .env and restart, then reinstall."
+      );
+    }
+    await mintLocationToken(tokens.companyId, config.ghl.locationId);
+    return { locationId: config.ghl.locationId };
+  }
+
+  throw new Error(
+    `OAuth token response had neither locationId nor companyId (got keys: ${Object.keys(tokens).join(", ")})`
+  );
+}
+
+/**
+ * Exchange an agency (company) token for a token scoped to one location.
+ * Used when the app was installed agency-wide.
+ */
+async function mintLocationToken(companyId, locationId) {
+  const company = getTokens(`company:${companyId}`);
+  if (!company?.access_token) {
+    throw new Error(`No company tokens stored for ${companyId}`);
+  }
+  const res = await axios.post(
+    `${config.ghl.apiBase}/oauth/locationToken`,
+    new URLSearchParams({ companyId, locationId }),
+    {
+      headers: {
+        Authorization: `Bearer ${company.access_token}`,
+        Version: "2021-07-28",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    }
+  );
+  const locTokens = { ...res.data, companyId, locationId };
+  setTokens(locationId, locTokens);
+  return locTokens;
 }
 
 async function refreshTokens(locationId) {
   const current = getTokens(locationId);
+
+  // Location tokens minted from a company token have no refresh_token of
+  // their own — refresh the company token, then mint a fresh location token.
+  if (!current?.refresh_token && current?.companyId) {
+    const companyKey = `company:${current.companyId}`;
+    const company = getTokens(companyKey);
+    if (company?.refresh_token) {
+      const res = await axios.post(
+        `${config.ghl.apiBase}/oauth/token`,
+        new URLSearchParams({
+          client_id: config.ghl.clientId,
+          client_secret: config.ghl.clientSecret,
+          grant_type: "refresh_token",
+          refresh_token: company.refresh_token,
+          user_type: "Company",
+        }),
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+      setTokens(companyKey, { ...company, ...res.data });
+    }
+    return mintLocationToken(current.companyId, locationId);
+  }
+
   if (!current?.refresh_token) {
     throw new Error(`No refresh token stored for location ${locationId} — reinstall the app`);
   }

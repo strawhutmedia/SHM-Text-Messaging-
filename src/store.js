@@ -30,6 +30,6 @@ export function setTokens(locationId, tokens) {
 }
 
 export function getAnyLocationId() {
-  const keys = Object.keys(load());
+  const keys = Object.keys(load()).filter((k) => !k.startsWith("company:"));
   return keys[0] || null;
 }
