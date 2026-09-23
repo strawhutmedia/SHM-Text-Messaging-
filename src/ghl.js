@@ -13,19 +13,26 @@ const API_VERSION = "2021-04-15"; // conversations endpoints
 const CONTACTS_VERSION = "2021-07-28"; // contacts endpoints
 
 export async function exchangeCode(code) {
+  const params = {
+    client_id: config.ghl.clientId,
+    client_secret: config.ghl.clientSecret,
+    grant_type: "authorization_code",
+    code,
+    user_type: "Location",
+  };
+  if (config.publicUrl) {
+    params.redirect_uri = `${config.publicUrl}/oauth/callback`;
+  }
   const res = await axios.post(
     `${config.ghl.apiBase}/oauth/token`,
-    new URLSearchParams({
-      client_id: config.ghl.clientId,
-      client_secret: config.ghl.clientSecret,
-      grant_type: "authorization_code",
-      code,
-    }),
+    new URLSearchParams(params),
     { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
   );
   const tokens = res.data;
   if (!tokens.locationId) {
-    throw new Error("OAuth token response did not include a locationId");
+    throw new Error(
+      `OAuth token response did not include a locationId (got keys: ${Object.keys(tokens).join(", ")})`
+    );
   }
   setTokens(tokens.locationId, tokens);
   return tokens;

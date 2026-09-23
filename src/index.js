@@ -43,8 +43,14 @@ app.get("/oauth/callback", async (req, res) => {
     console.log(`GHL app installed for location ${tokens.locationId}`);
     res.send("<h2>✅ Connected!</h2><p>GoHighLevel is now linked to your iMessage bridge. You can close this tab.</p>");
   } catch (err) {
-    console.error("OAuth exchange failed:", err.response?.data || err.message);
-    res.status(500).send("OAuth exchange failed — check the bridge logs.");
+    const detail = err.response?.data || err.message;
+    console.error("OAuth exchange failed:", JSON.stringify(detail, null, 2));
+    console.error("Using client_id:", `${config.ghl.clientId.slice(0, 12)}...`);
+    res
+      .status(500)
+      .send(
+        `<h2>OAuth exchange failed</h2><pre>${JSON.stringify(detail, null, 2)}</pre><p>Send a screenshot of this page to Claude.</p>`
+      );
   }
 });
 
