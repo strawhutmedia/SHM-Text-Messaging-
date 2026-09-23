@@ -14,7 +14,7 @@ GHL marketplace app ("SHM iMessage", private, sub-account):
 |---|---|---|
 | GHL Client ID | `6ab424ce53f60610d3d76c91-muehszpf` | `.env` → `GHL_CLIENT_ID` |
 | GHL Client Secret | `772f59b2-b2e1-437c-8ba6-75525eb62e05` | `.env` → `GHL_CLIENT_SECRET` |
-| GHL Conversation Provider ID | _(pending)_ | `.env` → `GHL_CONVERSATION_PROVIDER_ID` |
+| GHL Conversation Provider ID | `6ab428a761eac5d1f9526f3f` | `.env` → `GHL_CONVERSATION_PROVIDER_ID` |
 | GHL Location ID (Straw Hut Media sub-account) | `TrsMh89uPvyZdZ6Zrlyy` | app install target; token store key |
 
 Marketplace developer login: ryan@strawhutmedia.com (password not recorded here).
