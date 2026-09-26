@@ -18,3 +18,13 @@ GHL marketplace app ("SHM iMessage", private, sub-account):
 | GHL Location ID (Straw Hut Media sub-account) | `TrsMh89uPvyZdZ6Zrlyy` | app install target; token store key |
 
 Marketplace developer login: ryan@strawhutmedia.com (password not recorded here).
+
+ngrok (permanent bridge tunnel):
+
+| Credential | Value | Used where |
+|---|---|---|
+| ngrok authtoken | `3JsR9OMW5nIPd6KXYGbrlgnx1gJ_4Zx1w34B7WDhS6ubadfrr` | `ngrok config add-authtoken ...` on the Mac |
+| ngrok static domain | `raving-unknotted-ultra.ngrok-free.dev` | permanent bridge URL; GHL delivery URL |
+
+Firebase project: `bluebubbles-3d094` (Google account ryan@strawhutmedia.com) — BB client auto-discovery.
+Permanent GHL delivery URL: `https://raving-unknotted-ultra.ngrok-free.dev/webhooks/ghl?secret=<WEBHOOK_SECRET>`
