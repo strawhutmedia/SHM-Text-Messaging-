@@ -8,7 +8,7 @@ import { config } from "./config.js";
 const bb = axios.create({
   baseURL: config.bluebubbles.url,
   params: { password: config.bluebubbles.password },
-  timeout: 30_000,
+  timeout: 60_000,
 });
 
 /**

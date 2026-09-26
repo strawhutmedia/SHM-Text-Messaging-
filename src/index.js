@@ -81,14 +81,53 @@ app.get("/oauth/finish", requireSecret, async (_req, res) => {
 // ── Outbound: GHL → iMessage ─────────────────────────────────────
 // Set this as the Conversation Provider delivery URL:
 //   {PUBLIC_URL}/webhooks/ghl?secret=WEBHOOK_SECRET
+// Texts we auto-forwarded as SMS ourselves — if GHL routes that SMS back to
+// this webhook, skip it so we can't loop.
+const recentSmsForwards = new Set();
+
+async function smsFallback(locationId, contactId, messageId, phone, message) {
+  try {
+    const key = `${phone}:${message}`;
+    recentSmsForwards.add(key);
+    setTimeout(() => recentSmsForwards.delete(key), 5 * 60_000).unref();
+    await ghl.sendNativeSMS(locationId, contactId, message);
+    if (locationId && messageId) {
+      await ghl.updateMessageStatus(
+        locationId,
+        messageId,
+        "failed",
+        "Recipient has no iMessage — automatically re-sent as SMS from your business number"
+      );
+    }
+    console.log(`  ✓ auto-resent as SMS via the GHL number`);
+  } catch (err) {
+    console.error(`  ✗ SMS fallback failed:`, err.response?.data || err.message);
+  }
+}
+
 app.post("/webhooks/ghl", requireSecret, async (req, res) => {
   const { locationId, messageId, message, phone, contactId } = req.body || {};
-  console.log(`→ outbound from GHL: msg ${messageId} to ${phone}`);
 
   // Ack immediately; GHL retries on slow responses.
   res.json({ success: true });
 
   if (!phone || !message) return;
+
+  if (recentSmsForwards.has(`${phone}:${message}`)) {
+    console.log(`→ skipping our own SMS-forwarded message for ${phone}`);
+    return;
+  }
+  console.log(`→ outbound from GHL: msg ${messageId} to ${phone}`);
+
+  // If we can tell up front the recipient has no iMessage (Android), don't
+  // even try — send it as a normal SMS through the GHL number instead.
+  const available = await bb.checkIMessageAvailability(phone);
+  if (available === false) {
+    console.log(`  recipient not iMessage-capable — falling back to SMS`);
+    await smsFallback(locationId, contactId, messageId, phone, message);
+    return;
+  }
+
   try {
     const guid = await bb.sendText(phone, message);
     rememberSent(guid);
@@ -101,12 +140,17 @@ app.post("/webhooks/ghl", requireSecret, async (req, res) => {
     console.error(`  ✗ send failed for ${phone}:`, detail);
     if (locationId && messageId) {
       try {
-        await ghl.updateMessageStatus(locationId, messageId, "failed", `iMessage send failed: ${detail}`);
+        await ghl.updateMessageStatus(
+          locationId,
+          messageId,
+          "failed",
+          `iMessage send failed: ${detail}. If this contact is on Android, switch the channel to SMS.`
+        );
       } catch (statusErr) {
         console.error("  could not report failure to GHL:", statusErr.response?.data || statusErr.message);
       }
     }
-    void contactId; // present in payload; not needed for the failure path
+    void contactId; // used by the availability fallback path above
   }
 });
 

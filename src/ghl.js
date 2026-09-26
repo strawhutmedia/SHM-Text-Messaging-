@@ -267,6 +267,19 @@ export async function postInboundMessage(locationId, contactId, text) {
 }
 
 /**
+ * Send a plain SMS through the location's native phone system (the LC/323
+ * number). Used as the fallback when a recipient has no iMessage.
+ */
+export async function sendNativeSMS(locationId, contactId, text) {
+  const res = await ghlRequest(locationId, {
+    method: "POST",
+    url: "/conversations/messages",
+    data: { type: "SMS", contactId, message: text },
+  });
+  return res.data;
+}
+
+/**
  * Report delivery status back to GHL for an outbound message we handled.
  * status: "delivered" | "failed"
  */
