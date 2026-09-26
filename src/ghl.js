@@ -220,12 +220,19 @@ export async function getOrCreateConversation(locationId, contactId) {
   const existing = search.data?.conversations?.[0];
   if (existing) return existing.id;
 
-  const created = await ghlRequest(locationId, {
-    method: "POST",
-    url: "/conversations/",
-    data: { locationId, contactId },
-  });
-  return created.data?.conversation?.id || created.data?.id;
+  try {
+    const created = await ghlRequest(locationId, {
+      method: "POST",
+      url: "/conversations/",
+      data: { locationId, contactId },
+    });
+    return created.data?.conversation?.id || created.data?.id;
+  } catch (err) {
+    // GHL helpfully returns the existing conversation's id on this error.
+    const existingId = err.response?.data?.conversationId;
+    if (existingId) return existingId;
+    throw err;
+  }
 }
 
 /**
@@ -234,17 +241,29 @@ export async function getOrCreateConversation(locationId, contactId) {
  */
 export async function postInboundMessage(locationId, contactId, text) {
   const conversationId = await getOrCreateConversation(locationId, contactId);
-  const res = await ghlRequest(locationId, {
-    method: "POST",
-    url: "/conversations/messages/inbound",
-    data: {
-      type: "SMS",
-      conversationId,
-      conversationProviderId: config.ghl.conversationProviderId,
-      message: text,
-    },
-  });
-  return res.data;
+  const base = {
+    conversationId,
+    conversationProviderId: config.ghl.conversationProviderId,
+    message: text,
+  };
+  const post = (type) =>
+    ghlRequest(locationId, {
+      method: "POST",
+      url: "/conversations/messages/inbound",
+      data: { type, ...base },
+    });
+
+  // Custom conversation providers are picky about the message type label;
+  // which one GHL expects has shifted between releases. Try both.
+  try {
+    return (await post("SMS")).data;
+  } catch (err) {
+    const code = err.response?.data?.canonicalCode || "";
+    if (err.response?.status === 400 || code.includes("PROVIDER_MISMATCH")) {
+      return (await post("Custom")).data;
+    }
+    throw err;
+  }
 }
 
 /**
