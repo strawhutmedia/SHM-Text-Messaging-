@@ -9,6 +9,23 @@
   No assumed Terminal knowledge.
 - Prefers direct answers, gets frustrated by vague steps. Keep it simple.
 
+## MILESTONE 2026-09-26: END-TO-END WORKING 🎉
+
+- Inbound tested: iMessage → Mac → bridge → GHL conversation (✓ synced, contact auto-created)
+- Outbound tested: GHL reply → bridge → Mac → delivered to iPhone as iMessage
+- Mac Messages now signed into BUSINESS Apple ID: ryan@strawhutmedia.com
+  (email-only identity, no phone number; personal gmail account removed from Mac)
+- BlueBubbles webhook now points at http://localhost:3000 (tunnel-proof)
+- Firebase configured via Manual Setup (project bluebubbles-3d094, Google
+  account ryan@strawhutmedia.com) so BB clients auto-discover server URL
+- BlueBubbles web client (bluebubbles.app/web) for Ryan + Caroline (group
+  chats live here, not in GHL). Initial 4.6k-chat sync is slow/sticky.
+- Known cosmetic bug: BB Home shows stale "iMessage Email" (old gmail) — harmless
+- Remaining: permanence pass (stable tunnel for GHL delivery URL, pm2/launchd
+  auto-start for bridge+tunnel, Mac mini + optional SIM for phone-number identity)
+- GHL delivery URL must be re-pointed whenever bridge tunnel restarts
+  (marketplace app → Modules → Conversation Providers → iMessage → Delivery URL)
+
 ## Project state (as of 2026-09-23)
 
 - MacBook Pro is the TEST relay. Plan: buy used M1 Mac mini later as
